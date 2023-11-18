@@ -4,16 +4,17 @@ import os, re, threading, time, hashlib
 from queue import Queue
 
 #
-#   Version 1.0
+#   Version 1.0a
 #   Last Update: 2023nov17
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
+global file_types, user_destinations
 #String must end with directories full name as 'movies', 'shows', or 'anime'(which is the same as shows.)
 #String probably needs double backwards slashs(on windows), maybe linux also.
 #Relative paths probably work here also.
 #You can add as many locations here as you want. They just wont work if they dont meet the above requirements. Unless you change things...
-user_destinations = ["Z:\\plex\\movies", "Z:\\plex\\shows", "Z:\\plex\\anime"]
+user_destinations = ["L:\\plex\\movies", "L:\\plex\\shows", "L:\\plex\\anime"]
 #User defined file types to move.
 file_types = [".mp4", ".avi", ".mkv"]
 
@@ -185,16 +186,17 @@ class FileCopier:
     def set_current_destination_label(self, dest):
         self.current_dest_label.config(text=f"{dest}")
 
-    def find_movie_files(directory, extensions=None):
-        if extensions is None:
-            extensions = file_types
+def find_movie_files(directory, extensions=None):
+    global file_types
+    if extensions is None:
+        extensions = file_types
 
-        movie_files = []
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                if file.lower().endswith(tuple(extensions)):
-                    movie_files.append(os.path.join(root, file))
-        return movie_files
+    movie_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.lower().endswith(tuple(extensions)):
+                movie_files.append(os.path.join(root, file))
+    return movie_files
 
 def add_to_queue():
     source_dir = source_entry.get()
