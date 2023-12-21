@@ -4,19 +4,21 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.2b
-#   Last Update: 2023dec16
+#   Version 1.2c
+#   Last Update: 2023dec20
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
-global file_types, user_destinations
+global file_types, user_destinations, blacklist
 #String must end with directories full name as 'movies', 'shows', or 'anime'(which is the same as shows.)
 #String probably needs double backwards slashs(on windows), maybe linux also.
 #Relative paths probably work here also.
 #You can add as many locations here as you want. They just wont work if they dont meet the above requirements. Unless you change things...
 user_destinations = ["Z:\\plex\\movies", "Z:\\plex\\shows", "Z:\\plex\\anime"]
 #User defined file types to move.
-file_types = [".mp4", ".avi", ".mkv"]
+file_types = [".avi", ".mkv", ".mp4"]
+#Files that will be skipped if they match this, using re.search(pattern, string)
+blacklist = ['sample.mkv','sample.avi','sample.mp4'] #Will match anything with the word sample.avi in it. EX: <anything>-sample.avi
 
 class FileCopier:
     def __init__(self, queue, tree, current_dest_label):
@@ -231,7 +233,21 @@ def find_movie_files(directory, extensions=None):
         for file in files:
             if file.lower().endswith(tuple(extensions)):
                 movie_files.append(os.path.join(root, file))
-    return movie_files
+
+    files_to_copy = do_not_add_list(movie_files)
+    return files_to_copy
+def do_not_add_list(filelist):
+    filtered_list = []
+    do_not_add = False
+    for item in filelist:
+        do_not_add = False
+        for black_item in blacklist:
+            if re.search(black_item, item): #Probably should use a different method, but this gives advanced users more options.
+                do_not_add = True
+                print("Item Skipped:", item)
+        if not do_not_add:
+            filtered_list.append(item)
+    return filtered_list
 def add_to_queue():
     source_dir = source_entry.get()
     if not source_dir:
