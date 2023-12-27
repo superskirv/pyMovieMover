@@ -16,7 +16,7 @@ global file_types, user_destinations, blacklist
 #You can add as many locations here as you want. They just wont work if they dont meet the above requirements. Unless you change things...
 user_destinations = ["Z:\\plex\\movies", "Z:\\plex\\shows", "Z:\\plex\\anime"]
 #User defined file types to move.
-file_types = [".avi", ".mkv", ".mp4"]
+file_types = [".avi", ".mkv", ".mp4", ".srt"]
 #Files that will be skipped if they match this, using re.search(pattern, string)
 blacklist = ['sample.mkv','sample.avi','sample.mp4'] #Will match anything with the word sample.avi in it. EX: <anything>-sample.avi
 
@@ -199,9 +199,9 @@ class FileCopier:
                 self.tree.delete(children[0])
             self.retry = 0
         else:
-            subfolder = copier.get_subfolder(file, dest_loc)
-            tree.insert("", "end", values=(os.path.basename(file), os.path.join(dest_loc, subfolder) if subfolder else dest_loc))
-            self.queue.put((file, dest_loc))
+            subfolder = copier.get_subfolder(src, dest_loc)
+            tree.insert("", "end", values=(os.path.basename(src), os.path.join(dest_loc, subfolder) if subfolder else dest_loc))
+            self.queue.put((src, dest_loc))
 
         self.currently_copying = False
         self.copy_next_file()
