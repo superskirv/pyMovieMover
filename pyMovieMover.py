@@ -4,8 +4,8 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.2c
-#   Last Update: 2023dec20
+#   Version 1.2d
+#   Last Update: 2023dec27
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
@@ -86,34 +86,67 @@ class FileCopier:
         else:
             return subfolder
     def get_season(self, string):
-        pattern = r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2})'
-        match = re.search(pattern, string)
-        if match:
+        if re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2})', string): #S01E22 (season 01 episode 22)
+            match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2})', string)
+
             season_group = match.group(2) or match.group(3)
             season = season_group if season_group else None
+
+            return season
+        elif re.search(r'^(.*?)(?:(\d{1})x\d{2})', string): #1x22 (season X episode)
+            match = re.search(r'^(.*?)(?:(\d{1})x\d{2})', string)
+
+            season_group = match.group(2) or match.group(3)
+            season = season_group if season_group else None
+            season = season.zfill(2)
+
+            return season
+        elif re.search(r'^(.*?)(?:(\d{2})x\d{2})', string): #11x22 (season X episode)
+            match = re.search(r'^(.*?)(?:(\d{2})x\d{2})', string)
+
+            season_group = match.group(2) or match.group(3)
+            season = season_group if season_group else None
+
             return season
         else:
             return False
     def get_show_name(self, string):
-        pattern = r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})'
-        match = re.search(pattern, string)
-        #print("--match: ",match)
-        if match:
+        if re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string):
+            match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string)
+
             show_name_group = match.group(1)
             show_name = ' '.join(word.capitalize() for word in show_name_group.split('.'))
-            stripped_string = show_name.rstrip('-').strip()
+            show_name_with_spaces = show_name.replace('_', ' ').replace('-', ' ').title()
+            stripped_string = show_name_with_spaces.rstrip('-').strip()
+
+            return stripped_string
+        elif re.search(r'^(.*?)(?:S\d{2})', string):
+            match = re.search(r'^(.*?)(?:S\d{2})', string)
+
+            show_name = match.group(1)
+            formatted_show_name = ' '.join(word.capitalize() for word in show_name.split('.'))      #Need to search for underscores and spaces as well as periods.
+            show_name_with_spaces = formatted_show_name.replace('_', ' ').replace('-', ' ').title()
+            stripped_string = show_name_with_spaces.rstrip('-').strip()
+
+            return stripped_string
+        elif re.search(r'^([\w\s]+)\.\d+x\d+.*\.(.+)$', string):
+            match = re.search(r'^([\w\s]+)\.\d+x\d+.*\.(.+)$', string)
+
+            show_name_group = match.group(1)
+            show_name_with_spaces = show_name_group.replace('_', ' ').replace('-', ' ').title()
+            stripped_string = show_name_with_spaces.rstrip('-').strip()
+
+            return stripped_string
+        elif re.search(r'^([\w\s]+)[-_]\d+x\d+.*?[._](.+)$', string):
+            match = re.search(r'^([\w\s]+)[-_]\d+x\d+.*?[._](.+)$', string)
+
+            show_name_group = match.group(1)
+            show_name_with_spaces = show_name_group.replace('_', ' ').replace('-', ' ').title()
+            stripped_string = show_name_with_spaces.rstrip('-').strip()
+
             return stripped_string
         else:
-            pattern = r'^(.*?)(?:S\d{2})'
-            match = re.search(pattern, string)
-            #print("--match: ",match)
-            if match:
-                show_name = match.group(1)
-                formatted_show_name = ' '.join(word.capitalize() for word in show_name.split('.'))      #Need to search for underscores and spaces as well as periods.
-                stripped_string = show_name.rstrip('-').strip()
-                return stripped_string
-            else:
-                return "0000-Show-Name"
+            return "0000-Show-Name"
     def copy_file_thread(self, src, dest):
         self.stop_copy = False
         self.currently_copying = True
