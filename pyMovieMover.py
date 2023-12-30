@@ -4,8 +4,8 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.2d
-#   Last Update: 2023dec27
+#   Version 1.3
+#   Last Update: 2023dec30
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
@@ -21,15 +21,20 @@ file_types = [".avi", ".mkv", ".mp4", ".srt"]
 blacklist = ['sample.mkv','sample.avi','sample.mp4'] #Will match anything with the word sample.avi in it. EX: <anything>-sample.avi
 
 class FileCopier:
-    def __init__(self, queue, tree, current_dest_label):
+    def __init__(self, queue, tree, current_dest_label, queue_button_frame):
         self.queue = queue
         self.tree = tree  # Updated reference to tree
-        self.current_dest_label = current_dest_label
         self.stop_copy = False
         self.currently_copying = False
         self.paused = False
         self.kill_copy = False
         self.retry = 0
+
+        self.default_button_color = None
+        self.current_dest_label = current_dest_label
+        self.queue_button_frame = queue_button_frame
+        self.pause_button = None
+        self.stop_button = None
     def copy_next_file(self):
         if not self.queue.empty():
             self.currently_copying = True
@@ -111,6 +116,12 @@ class FileCopier:
         else:
             return False
     def get_show_name(self, string):
+        pattern = re.compile(r'\[.*?\]')
+        string = re.sub(pattern, '', string)
+
+        pattern = re.compile(r'\(.*?\)')
+        string = re.sub(pattern, '', string)
+
         if re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string):
             match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string)
 
@@ -146,12 +157,10 @@ class FileCopier:
 
             return stripped_string
         else:
-            return "0000-Show-Name"
+            return "0000-Bad-Name"
     def copy_file_thread(self, src, dest):
-        self.stop_copy = False
         self.currently_copying = True
         self.kill_copy = False
-        self.paused = False
         dest_loc = dest
         # Create the subfolder based on the first letter of the file name
         subfolder = self.get_subfolder(src, dest)
@@ -185,14 +194,12 @@ class FileCopier:
         copied = 0
         start_time = time.time()
 
-        if not os.path.exists(dest):
+        if self.file_safe_to_copy(dest, src):
             try:
                 with open(src, 'rb') as fsrc, open(dest, 'wb') as fdst:
                     while True:
-                        if self.stop_copy:
-                            os.remove(dest)  # Delete partially copied file
-                            break
                         if self.kill_copy:
+                            os.remove(dest)
                             break
                         if self.paused:
                             time.sleep(1)  # Pause for 1 second
@@ -209,7 +216,7 @@ class FileCopier:
                         self.update_gui_progress(copied / file_size, speed, eta, dest)
                         percent = copied / file_size
             except PermissionError as e:
-                self.retry += 1
+                self.retry += 9
                 if self.retry > 3:
                     print(f"An Permission Error occurred: {e}\nDeleting partial file and skipping.", dest)
                     os.remove(dest)
@@ -217,7 +224,7 @@ class FileCopier:
                     print(f"An Permission Error occurred: \nRetring file {3-self.retry} more times before skipping.", dest)
                     os.remove(dest)
             except Exception as e:
-                self.retry += 1
+                self.retry += 9
                 if self.retry > 3:
                     #self.update_gui_error(f"Current file will be deleted. An error occurred: {e}")
                     print(f"An error occurred: {e}\nCurrent file will be deleted.", dest)
@@ -233,8 +240,8 @@ class FileCopier:
             self.retry = 0
         else:
             subfolder = copier.get_subfolder(src, dest_loc)
-            tree.insert("", "end", values=(os.path.basename(src), os.path.join(dest_loc, subfolder) if subfolder else dest_loc))
-            self.queue.put((src, dest_loc))
+            #tree.insert("", "end", values=(os.path.basename(src), os.path.join(dest_loc, subfolder) if subfolder else dest_loc))
+            #self.queue.put((src, dest_loc))
 
         self.currently_copying = False
         self.copy_next_file()
@@ -251,11 +258,60 @@ class FileCopier:
         messagebox.showerror("Error", message)
     def skip_current_file(self):
         if self.currently_copying:
-            self.stop_copy = True
+            self.kill_copy = True
+            self.paused = True
+            self.update_pause_gui()
     def toggle_pause(self):
+        if self.pause_button == None:
+            self.find_gui_pause_button()
         self.paused = not self.paused
+        self.update_pause_gui()
+    def toggle_stop(self):
+        if self.stop_button == None:
+            self.find_gui_stop_button()
+        self.stop_copy = not self.stop_copy
+        self.update_stop_gui()
+    def update_pause_gui(self):
+        if self.pause_button == None:
+            self.find_gui_pause_button()
+        if self.paused:
+            self.pause_button.configure(background="red")
+        else:
+            self.pause_button.configure(background=self.default_button_color)
+    def update_stop_gui(self):
+        if self.stop_button == None:
+            self.find_gui_stop_button()
+        if self.stop_copy:
+            self.stop_button.configure(background="red")
+        else:
+            self.stop_button.configure(background=self.default_button_color)
+    def find_gui_pause_button(self):
+        for child_widget in self.queue_button_frame.winfo_children():
+            if isinstance(child_widget, tk.Button) and child_widget.cget("text") == "Pause/Resume":
+                self.pause_button = child_widget
+                break
+        self.default_button_color = self.pause_button.cget("background")
+    def find_gui_stop_button(self):
+        for child_widget in self.queue_button_frame.winfo_children():
+            if isinstance(child_widget, tk.Button) and child_widget.cget("text") == "Stop After This":
+                self.stop_button = child_widget
+                break
+        self.default_button_color = self.stop_button.cget("background")
     def set_current_destination_label(self, dest):
         self.current_dest_label.config(text=f"{dest}")
+    def file_safe_to_copy(self, dest_file_path, src_file_path):
+        if self.stop_copy:
+            return False
+        if os.path.exists(dest_file_path):
+            size1 = os.path.getsize(dest_file_path)
+            size2 = os.path.getsize(src_file_path)
+
+            if size1 != size2:
+                return True
+            else:
+                return False
+        else:
+            return True
 def find_movie_files(directory, extensions=None):
     global file_types
     if extensions is None:
@@ -316,17 +372,22 @@ def delete_selected():
     if selected_item:
         tree.delete(selected_item[0])
         remove_from_queue(selected_item[0])
-def stop_copy():
-    copier.stop_copy = True
 def clear_queue():
     if tree.get_children():
         tree.delete(*tree.get_children())
         remove_from_queue()
 def remove_from_queue(index=None):
     if index is not None:
-        queue.queue.queue = [item for i, item in enumerate(queue.queue.queue) if i != index]
+        # Remove the item from the underlying queue
+        queue.queue.remove(index)
     else:
-        queue.queue.queue.clear()
+        # Clear the underlying queue
+        queue.queue.clear()
+
+    # Clear the GUI queue (Treeview)
+    children = tree.get_children()
+    if children:
+        tree.delete(*children)
 
 app = tk.Tk()
 app.title("Movie File Copier")
@@ -347,7 +408,7 @@ progress_frame.pack(fill=tk.X, side=tk.BOTTOM)
 current_destination_label = tk.Label(progress_frame, text="Destination: N/A")
 current_destination_label.pack(side=tk.TOP)
 
-copier = FileCopier(queue, None, current_destination_label)
+#copier = FileCopier(queue, None, current_destination_label, queue_button_frame)
 
 source_entry = tk.Entry(button_frame)
 source_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
@@ -383,11 +444,11 @@ tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 tree_scrollbar.config(command=tree.yview)
 tree_scrollbar.pack(side=tk.RIGHT, fill="y")
 
-copier = FileCopier(queue, tree, current_destination_label)
-
 # Queue Button Frame
 queue_button_frame = tk.Frame(queue_main_frame)
 queue_button_frame.pack(fill=tk.X)
+
+copier = FileCopier(queue, tree, current_destination_label, queue_button_frame)
 
 queue_button = tk.Button(queue_button_frame, text="Add to Queue", command=add_to_queue)
 queue_button.pack()
@@ -398,7 +459,7 @@ start_button.pack()
 pause_button = tk.Button(queue_button_frame, text="Pause/Resume", command=copier.toggle_pause)
 pause_button.pack()
 
-pause_button = tk.Button(queue_button_frame, text="Stop", command=stop_copy)
+pause_button = tk.Button(queue_button_frame, text="Stop After This", command=copier.toggle_stop)
 pause_button.pack()
 
 skip_button = tk.Button(queue_button_frame, text="Skip Current File", command=copier.skip_current_file)
