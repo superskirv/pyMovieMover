@@ -18,6 +18,8 @@ About: This is designed to allow you to sequentially move large files from your 
      - Season XX for second sub folder.
  - Blacklist:
     - This is a custom list to avoid certain files. By default it will skip a few sample video files. But the black list supports regexp type entries if you want to get more complicated. Im just lazy, so I am just adding exact file names as I come across them.
+ - Extra List:
+   - This is a custom list to attempt to place files into a season folder called "extras", it isnt very good at it right now, but I will work on it.
  - ISSUES: If the file name doesnt meet the exacting requiremnts, it will have issues. Please review the destination before coping file.
  <br><br>
  There is a queuing system but its very far from perfect. You may have to delete partially moved files when it hangs or you terminate mid transfer. It has a built in skip feature to avoid copying the same file twice and will overwrite files of different sizes. Im planning to incorporate a md5 hash check into it, but that makes it all run rather slow. Mostly I need a better/more ways to figure out movie titles/season names/season numbers.
