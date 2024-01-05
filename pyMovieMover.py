@@ -4,8 +4,8 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.3
-#   Last Update: 2023dec30
+#   Version 1.3a
+#   Last Update: 2024jan04
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
@@ -19,6 +19,8 @@ user_destinations = ["Z:\\plex\\movies", "Z:\\plex\\shows", "Z:\\plex\\anime"]
 file_types = [".avi", ".mkv", ".mp4", ".srt"]
 #Files that will be skipped if they match this, using re.search(pattern, string)
 blacklist = ['sample.mkv','sample.avi','sample.mp4'] #Will match anything with the word sample.avi in it. EX: <anything>-sample.avi
+#Files that will be considered Extras
+extras = ['NC','NCOP','NCED','NC OP','NC ED']
 
 class FileCopier:
     def __init__(self, queue, tree, current_dest_label, queue_button_frame):
@@ -40,19 +42,20 @@ class FileCopier:
             self.currently_copying = True
             src, dest = self.queue.get()
             threading.Thread(target=self.copy_file_thread, args=(src, dest)).start()
-    def get_file_md5(self, file_path):
-        # Calculate the MD5 hash of a file
-        md5 = hashlib.md5()
-        with open(file_path, 'rb') as f:
-            while True:
-                data = f.read(4096)  # Read in 4K chunks
-                if not data:
-                    break
-                md5.update(data)
-        return md5.hexdigest()
+    # def get_file_md5(self, file_path):
+    #     # Calculate the MD5 hash of a file
+    #     md5 = hashlib.md5()
+    #     with open(file_path, 'rb') as f:
+    #         while True:
+    #             data = f.read(4096)  # Read in 4K chunks
+    #             if not data:
+    #                 break
+    #             md5.update(data)
+    #     return md5.hexdigest()
     def get_subfolder(self, src, dest):
         file_name = os.path.basename(src)
         dir_type = os.path.basename(dest)
+
         if dir_type == "movies":
             subfolder = self.get_movie_letter(file_name)
             if subfolder:
@@ -60,13 +63,18 @@ class FileCopier:
             else:
                 return False
         elif dir_type == "shows" or dir_type == "anime":
-            show_name = self.get_show_name(file_name)
-            season_num = self.get_season(file_name)
+            show_name = self.get_show_name(file_name, src)
+            season_num = self.get_season(file_name, src)
 
-            # print('show_name: ',show_name)
-            # print('season_num: ',season_num)
-            # print('file_name: ',file_name)
+            for extra in extras:
+                if re.search(extra, show_name):
+                    new_src = os.path.dirname(src)
+                    show_name = self.get_show_name(file_name, new_src)
+                    file_name = ' extra '
+                    season_num = None
+                    break
 
+            subfolder = ''
             season_name = None
             if "extra" in file_name:
                 season_name = 'Extras'
@@ -76,11 +84,11 @@ class FileCopier:
             elif season_num:
                 season_name = 'Season ' + season_num
             else:
-                return False
-            subfolders = os.path.join(show_name, season_name)
-            return subfolders
+                return "0001-Bad-Show-Name"
+            subfolder = os.path.join(show_name, season_name)
+            return subfolder
         else:
-            return False
+            return "0002-Bad-Show-Name"
     def get_movie_letter(self, string):
         if string.lower().startswith("the"):
             string = re.sub(r'^the[^a-zA-Z0-9]*', '', string, flags=re.IGNORECASE)
@@ -90,7 +98,7 @@ class FileCopier:
             return "#"
         else:
             return subfolder
-    def get_season(self, string):
+    def get_season(self, string, full_path):
         if re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2})', string): #S01E22 (season 01 episode 22)
             match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2})', string)
 
@@ -98,7 +106,7 @@ class FileCopier:
             season = season_group if season_group else None
 
             return season
-        elif re.search(r'^(.*?)(?:(\d{1})x\d{2})', string): #1x22 (season X episode)
+        elif re.search(r'^(.*?)(?:(\d{1})x\d{2})', string): #1x22 (season 1 X episode 22)
             match = re.search(r'^(.*?)(?:(\d{1})x\d{2})', string)
 
             season_group = match.group(2) or match.group(3)
@@ -106,7 +114,7 @@ class FileCopier:
             season = season.zfill(2)
 
             return season
-        elif re.search(r'^(.*?)(?:(\d{2})x\d{2})', string): #11x22 (season X episode)
+        elif re.search(r'^(.*?)(?:(\d{2})x\d{2})', string): #11x22 (season 11 X episode 22)
             match = re.search(r'^(.*?)(?:(\d{2})x\d{2})', string)
 
             season_group = match.group(2) or match.group(3)
@@ -114,13 +122,18 @@ class FileCopier:
 
             return season
         else:
-            return False
-    def get_show_name(self, string):
-        pattern = re.compile(r'\[.*?\]')
-        string = re.sub(pattern, '', string)
+            last_folder = os.path.basename(os.path.dirname(full_path))
 
-        pattern = re.compile(r'\(.*?\)')
-        string = re.sub(pattern, '', string)
+            pattern = r'Season (\d+)'
+            match = re.search(pattern, last_folder)
+            if match:
+                season_num = match.group(1)
+                season_num = season_num.zfill(2)
+                return season_num
+            else:
+                return "0000-Bad-Season-Name"
+    def get_show_name(self, name, full_path):
+        string = self.remove_brackets(name)
 
         if re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string):
             match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string)
@@ -157,7 +170,33 @@ class FileCopier:
 
             return stripped_string
         else:
-            return "0000-Bad-Name"
+            ##Failed to find sub folder from file name, trying folder name.
+            last_folder = os.path.basename(os.path.dirname(full_path))
+            string = self.remove_brackets(last_folder)
+            if "-" in string:
+                parts = string.split("-")
+            elif "." in string:
+                parts = string.split(".")
+            elif "_" in string:
+                parts = string.split("_")
+            else:
+                show_name = string.strip()
+                return show_name
+
+            max_letters_count = 0
+            save_string = ""
+            for part in parts:
+                non_letters_count = sum(1 for char in part if char.isalpha() == False)
+
+                if len(part) - non_letters_count > max_letters_count:
+                    max_letters_count = len(part) - non_letters_count
+                    save_string = part
+            show_name = save_string
+
+            if show_name:
+                return show_name
+            return "0003-Bad-Show-Name"
+        return False
     def copy_file_thread(self, src, dest):
         self.currently_copying = True
         self.kill_copy = False
@@ -312,6 +351,13 @@ class FileCopier:
                 return False
         else:
             return True
+    def remove_brackets(self, name):
+        pattern = re.compile(r'\[.*?\]')
+        string = re.sub(pattern, '', name)
+
+        pattern = re.compile(r'\(.*?\)')
+        string = re.sub(pattern, '', string)
+        return string
 def find_movie_files(directory, extensions=None):
     global file_types
     if extensions is None:
