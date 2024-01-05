@@ -4,7 +4,7 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.3a
+#   Version 1.3b
 #   Last Update: 2024jan04
 #   Created by: ChatGPT4 and Super.Skirv
 #
@@ -86,6 +86,7 @@ class FileCopier:
             else:
                 return "0001-Bad-Show-Name"
             subfolder = os.path.join(show_name, season_name)
+            subfolder = re.sub(r'\s+', ' ', subfolder)
             return subfolder
         else:
             return "0002-Bad-Show-Name"
@@ -139,36 +140,38 @@ class FileCopier:
             match = re.search(r'^(.*?)(?:S(\d{2})E\d{2}|s(\d{2})e\d{2}|S(\d{2})E\d{2}-E\d{2}|s(\d{2})e\d{2}-e\d{2})', string)
 
             show_name_group = match.group(1)
-            show_name = ' '.join(word.capitalize() for word in show_name_group.split('.'))
-            show_name_with_spaces = show_name.replace('_', ' ').replace('-', ' ').title()
+            show_name_with_spaces = show_name_group.replace('.', ' ').replace('_', ' ').replace('-', ' ').title()      #Need to search for underscores and spaces as well as periods.
             stripped_string = show_name_with_spaces.rstrip('-').strip()
+            show_name = self.fix_capitalize(stripped_string)
 
-            return stripped_string
+            return show_name
         elif re.search(r'^(.*?)(?:S\d{2})', string):
             match = re.search(r'^(.*?)(?:S\d{2})', string)
 
             show_name = match.group(1)
-            formatted_show_name = ' '.join(word.capitalize() for word in show_name.split('.'))      #Need to search for underscores and spaces as well as periods.
-            show_name_with_spaces = formatted_show_name.replace('_', ' ').replace('-', ' ').title()
+            show_name_with_spaces = formatted_show_name.replace('.', ' ').replace('_', ' ').replace('-', ' ').title()
             stripped_string = show_name_with_spaces.rstrip('-').strip()
+            show_name = self.fix_capitalize(stripped_string)
 
-            return stripped_string
+            return show_name
         elif re.search(r'^([\w\s]+)\.\d+x\d+.*\.(.+)$', string):
             match = re.search(r'^([\w\s]+)\.\d+x\d+.*\.(.+)$', string)
 
             show_name_group = match.group(1)
-            show_name_with_spaces = show_name_group.replace('_', ' ').replace('-', ' ').title()
+            show_name_with_spaces = show_name_group.replace('.', ' ').replace('_', ' ').replace('-', ' ').title()
             stripped_string = show_name_with_spaces.rstrip('-').strip()
+            show_name = self.fix_capitalize(stripped_string)
 
-            return stripped_string
+            return show_name
         elif re.search(r'^([\w\s]+)[-_]\d+x\d+.*?[._](.+)$', string):
             match = re.search(r'^([\w\s]+)[-_]\d+x\d+.*?[._](.+)$', string)
 
             show_name_group = match.group(1)
-            show_name_with_spaces = show_name_group.replace('_', ' ').replace('-', ' ').title()
+            show_name_with_spaces = show_name_group.replace('.', ' ').replace('_', ' ').replace('-', ' ').title()
             stripped_string = show_name_with_spaces.rstrip('-').strip()
+            show_name = self.fix_capitalize(stripped_string)
 
-            return stripped_string
+            return show_name
         else:
             ##Failed to find sub folder from file name, trying folder name.
             last_folder = os.path.basename(os.path.dirname(full_path))
@@ -191,7 +194,7 @@ class FileCopier:
                 if len(part) - non_letters_count > max_letters_count:
                     max_letters_count = len(part) - non_letters_count
                     save_string = part
-            show_name = save_string
+            show_name = self.fix_capitalize(save_string)
 
             if show_name:
                 return show_name
@@ -358,6 +361,9 @@ class FileCopier:
         pattern = re.compile(r'\(.*?\)')
         string = re.sub(pattern, '', string)
         return string
+    def fix_capitalize(self, string):
+        show_name = ' '.join(word.capitalize() for word in string.split(' '))
+        return show_name
 def find_movie_files(directory, extensions=None):
     global file_types
     if extensions is None:
