@@ -4,7 +4,7 @@ import os, re, threading, time
 from queue import Queue
 #import hashlib
 #
-#   Version 1.3b
+#   Version 1.31
 #   Last Update: 2024jan04
 #   Created by: ChatGPT4 and Super.Skirv
 #
@@ -20,7 +20,7 @@ file_types = [".avi", ".mkv", ".mp4", ".srt"]
 #Files that will be skipped if they match this, using re.search(pattern, string)
 blacklist = ['sample.mkv','sample.avi','sample.mp4'] #Will match anything with the word sample.avi in it. EX: <anything>-sample.avi
 #Files that will be considered Extras
-extras = ['NC','NCOP','NCED','NC OP','NC ED']
+extras = ['NC','NCOP','NCED','NC OP','NC ED','extra']
 
 class FileCopier:
     def __init__(self, queue, tree, current_dest_label, queue_button_frame):
@@ -70,13 +70,13 @@ class FileCopier:
                 if re.search(extra, show_name):
                     new_src = os.path.dirname(src)
                     show_name = self.get_show_name(file_name, new_src)
-                    file_name = ' extra '
+                    file_name = 'extra'
                     season_num = None
                     break
 
             subfolder = ''
             season_name = None
-            if "extra" in file_name:
+            if "extra" in file_name.lower():
                 season_name = 'Extras'
                 season_num = None
             elif not show_name:
@@ -397,7 +397,7 @@ def add_to_queue():
 
     files_to_copy = find_movie_files(source_dir)
     if not files_to_copy:
-        messagebox.showinfo("Info", "No movie files found in the selected directory.")
+        messagebox.showinfo("Info", "No files found in the selected directory.")
         return
 
     dest = dest_entry.get()  # Get the selected destination folder
@@ -421,9 +421,20 @@ def start_copying():
         copier.copy_next_file()
 def delete_selected():
     selected_item = tree.selection()
+    if not selected_item:
+        # If nothing is selected, assume deletion of the first item
+        selected_item = tree.get_children()[0:1]
+
     if selected_item:
+        # Get the index of the selected item
+        selected_index = tree.index(selected_item[0])
+        file_info = tree.item(selected_item[0], 'values')  # Assuming file name and dest are stored in values
         tree.delete(selected_item[0])
-        remove_from_queue(selected_item[0])
+        try:
+            queue_item = queue.queue[selected_index]
+            queue.queue.remove(queue_item)
+        except IndexError:
+            print("Error: Index out of range.")
 def clear_queue():
     if tree.get_children():
         tree.delete(*tree.get_children())
@@ -440,7 +451,6 @@ def remove_from_queue(index=None):
     children = tree.get_children()
     if children:
         tree.delete(*children)
-
 app = tk.Tk()
 app.title("Movie File Copier")
 
