@@ -2,10 +2,10 @@ import tkinter as tk
 from tkinter import ttk, Scrollbar, filedialog, messagebox
 import os, re, threading, time
 from queue import Queue
-#import hashlib
 #
-#   Version 1.31
-#   Last Update: 2024jan04
+#   Version 1.31d
+#           -This is the final version for V1, V2 is underway. Will be a completely new re-write.
+#   Last Update: 2024jan15
 #   Created by: ChatGPT4 and Super.Skirv
 #
 
@@ -42,16 +42,6 @@ class FileCopier:
             self.currently_copying = True
             src, dest = self.queue.get()
             threading.Thread(target=self.copy_file_thread, args=(src, dest)).start()
-    # def get_file_md5(self, file_path):
-    #     # Calculate the MD5 hash of a file
-    #     md5 = hashlib.md5()
-    #     with open(file_path, 'rb') as f:
-    #         while True:
-    #             data = f.read(4096)  # Read in 4K chunks
-    #             if not data:
-    #                 break
-    #             md5.update(data)
-    #     return md5.hexdigest()
     def get_subfolder(self, src, dest):
         file_name = os.path.basename(src)
         dir_type = os.path.basename(dest)
